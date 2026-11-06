@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -90,6 +91,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -101,6 +103,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -251,16 +256,14 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: (@Composab
     }
 }
 
-/** Fixed top bar: stays put while the screen content scrolls underneath. */
+/** Fixed top bar: no hard line; a soft shadow fades in only once content scrolls under it. */
 @Composable
-fun AppHeader(title: String, subtitle: String? = null) {
-    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.statusBarsPadding()) {
-            Column(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 20.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
-                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title, style = MaterialTheme.typography.headlineSmall)
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+fun AppHeader(title: String, subtitle: String? = null, elevated: Boolean = false) {
+    val shadow by animateDpAsState(if (elevated) 6.dp else 0.dp, tween(200), label = "hdrShadow")
+    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background, shadowElevation = shadow) {
+        Column(Modifier.statusBarsPadding().fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 20.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.headlineSmall)
         }
     }
 }
@@ -466,6 +469,16 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var urge by rememberSaveable { mutableStateOf(false) }
     val snack = remember { SnackbarHostState() }
+    var scrollY by remember { mutableFloatStateOf(0f) }
+    val scrollWatcher = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                scrollY = minOf(0f, scrollY + consumed.y)
+                return Offset.Zero
+            }
+        }
+    }
+    LaunchedEffect(tab) { scrollY = 0f }
 
     LaunchedEffect(urgeTick) { if (urgeTick > 0) urge = true }
     LaunchedEffect(Unit) { vm.events.collect { snack.showSnackbar(it) } }
@@ -481,8 +494,8 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
                 snackbarHost = { SnackbarHost(snack) },
                 topBar = {
                     if (tab == Tab.Home) {
-                        AppHeader("Today", LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase())
-                    } else AppHeader(tab.label)
+                        AppHeader("Today", LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase(), elevated = scrollY < -4f)
+                    } else AppHeader(tab.label, elevated = scrollY < -4f)
                 },
                 floatingActionButton = {
                     if (tab == Tab.Home) {
@@ -508,7 +521,7 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
                     }
                 },
             ) { inner ->
-                Box(Modifier.padding(inner)) {
+                Box(Modifier.padding(inner).nestedScroll(scrollWatcher)) {
                     Crossfade(tab, label = "tab") { current ->
                         when (current) {
                             Tab.Home -> HomeScreen(vm, s, goTimer = { tab = Tab.Timer }, goBlocker = { tab = Tab.Blocker })
