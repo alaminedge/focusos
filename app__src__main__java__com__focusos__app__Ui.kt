@@ -12,7 +12,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -107,6 +110,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -125,6 +129,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -235,7 +240,9 @@ fun ProgressRing(
     track: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-    val p by animateFloatAsState(progress.coerceIn(0f, 1f), tween(600, easing = FastOutSlowInEasing), label = "ring")
+    var shown by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(progress) { shown = progress.coerceIn(0f, 1f) }
+    val p by animateFloatAsState(shown, tween(900, easing = FastOutSlowInEasing), label = "ring")
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = stroke.toPx()
@@ -400,6 +407,46 @@ fun guardUi(perms: Perms, s: AppSettings, t: TimerState, apps: List<TrackedApp>,
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  SPLASH  (plays once per app launch)
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+private object SplashGate { var shown = false }
+
+@Composable
+fun SplashOverlay(onFinished: () -> Unit) {
+    val ring = remember { Animatable(0f) }
+    val dot = remember { Animatable(0f) }
+    val label = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch { ring.animateTo(1f, tween(800, easing = FastOutSlowInEasing)) }
+        launch { delay(350); dot.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
+        launch { delay(600); label.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+        delay(1500)
+        onFinished()
+    }
+    val cs = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize().background(cs.background), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Canvas(Modifier.size(96.dp)) {
+                val w = 8.dp.toPx()
+                val arc = Size(size.width - w, size.height - w)
+                drawArc(cs.surfaceContainerHigh, 0f, 360f, false, Offset(w / 2, w / 2), arc, style = Stroke(w))
+                drawArc(cs.primary, -90f, 360f * ring.value, false, Offset(w / 2, w / 2), arc, style = Stroke(w, cap = StrokeCap.Round))
+                drawCircle(cs.primary, radius = 14.dp.toPx() * dot.value)
+            }
+            Spacer(Modifier.size(24.dp))
+            Column(
+                Modifier.graphicsLayer { alpha = label.value; translationY = (1f - label.value) * 16.dp.toPx() },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Focus OS", style = MaterialTheme.typography.headlineLarge)
+                Text("Study deeply. Stay present.", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  ACTIVITY + ROOT
  * ════════════════════════════════════════════════════════════════════════════ */
 
@@ -447,7 +494,15 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             val st by vm.settings.collectAsStateWithLifecycle()
-            FocusTheme(st?.theme ?: 0) { AppRoot(vm, host, urgeTick) }
+            FocusTheme(st?.theme ?: 0) {
+                var splash by remember { mutableStateOf(!SplashGate.shown && urgeTick == 0) }
+                Box(Modifier.fillMaxSize()) {
+                    AppRoot(vm, host, urgeTick)
+                    AnimatedVisibility(visible = splash, exit = fadeOut(tween(400))) {
+                        SplashOverlay { SplashGate.shown = true; splash = false }
+                    }
+                }
+            }
         }
     }
 

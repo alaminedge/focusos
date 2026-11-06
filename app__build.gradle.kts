@@ -18,7 +18,18 @@ android {
         versionName = "1.0.0"
     }
 
+    // One fixed key for every build, so a new APK always installs over the old one.
+    signingConfigs {
+        create("stable") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug { signingConfig = signingConfigs.getByName("stable") }
         release { isMinifyEnabled = false }
     }
 
