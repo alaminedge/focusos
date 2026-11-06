@@ -12,12 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -94,7 +90,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -106,11 +101,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -129,7 +120,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -240,9 +230,7 @@ fun ProgressRing(
     track: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-    var shown by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(progress) { shown = progress.coerceIn(0f, 1f) }
-    val p by animateFloatAsState(shown, tween(900, easing = FastOutSlowInEasing), label = "ring")
+    val p by animateFloatAsState(progress.coerceIn(0f, 1f), tween(600, easing = FastOutSlowInEasing), label = "ring")
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = stroke.toPx()
@@ -263,11 +251,10 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: (@Composab
     }
 }
 
-/** Fixed top bar: no hard line; a soft shadow fades in only once content scrolls under it. */
+/** Fixed top bar. Flat, same colour as the page, no line and no shadow. */
 @Composable
-fun AppHeader(title: String, subtitle: String? = null, elevated: Boolean = false) {
-    val shadow by animateDpAsState(if (elevated) 6.dp else 0.dp, tween(200), label = "hdrShadow")
-    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background, shadowElevation = shadow) {
+fun AppHeader(title: String, subtitle: String? = null) {
+    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding().fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 20.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(title, style = MaterialTheme.typography.headlineSmall)
@@ -412,16 +399,11 @@ fun guardUi(perms: Perms, s: AppSettings, t: TimerState, apps: List<TrackedApp>,
 
 private object SplashGate { var shown = false }
 
+/** Static intro screen: no animation, shown briefly then replaced by the app. */
 @Composable
 fun SplashOverlay(onFinished: () -> Unit) {
-    val ring = remember { Animatable(0f) }
-    val dot = remember { Animatable(0f) }
-    val label = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        launch { ring.animateTo(1f, tween(800, easing = FastOutSlowInEasing)) }
-        launch { delay(350); dot.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
-        launch { delay(600); label.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
-        delay(1500)
+        delay(1000)
         onFinished()
     }
     val cs = MaterialTheme.colorScheme
@@ -430,18 +412,12 @@ fun SplashOverlay(onFinished: () -> Unit) {
             Canvas(Modifier.size(96.dp)) {
                 val w = 8.dp.toPx()
                 val arc = Size(size.width - w, size.height - w)
-                drawArc(cs.surfaceContainerHigh, 0f, 360f, false, Offset(w / 2, w / 2), arc, style = Stroke(w))
-                drawArc(cs.primary, -90f, 360f * ring.value, false, Offset(w / 2, w / 2), arc, style = Stroke(w, cap = StrokeCap.Round))
-                drawCircle(cs.primary, radius = 14.dp.toPx() * dot.value)
+                drawArc(cs.primary, 0f, 360f, false, Offset(w / 2, w / 2), arc, style = Stroke(w))
+                drawCircle(cs.primary, radius = 14.dp.toPx())
             }
             Spacer(Modifier.size(24.dp))
-            Column(
-                Modifier.graphicsLayer { alpha = label.value; translationY = (1f - label.value) * 16.dp.toPx() },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text("Focus OS", style = MaterialTheme.typography.headlineLarge)
-                Text("Study deeply. Stay present.", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
-            }
+            Text("Focus OS", style = MaterialTheme.typography.headlineLarge)
+            Text("Study deeply. Stay present.", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
         }
     }
 }
@@ -498,9 +474,7 @@ class MainActivity : ComponentActivity() {
                 var splash by remember { mutableStateOf(!SplashGate.shown && urgeTick == 0) }
                 Box(Modifier.fillMaxSize()) {
                     AppRoot(vm, host, urgeTick)
-                    AnimatedVisibility(visible = splash, exit = fadeOut(tween(400))) {
-                        SplashOverlay { SplashGate.shown = true; splash = false }
-                    }
+                    if (splash) SplashOverlay { SplashGate.shown = true; splash = false }
                 }
             }
         }
@@ -524,16 +498,6 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var urge by rememberSaveable { mutableStateOf(false) }
     val snack = remember { SnackbarHostState() }
-    var scrollY by remember { mutableFloatStateOf(0f) }
-    val scrollWatcher = remember {
-        object : NestedScrollConnection {
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                scrollY = minOf(0f, scrollY + consumed.y)
-                return Offset.Zero
-            }
-        }
-    }
-    LaunchedEffect(tab) { scrollY = 0f }
 
     LaunchedEffect(urgeTick) { if (urgeTick > 0) urge = true }
     LaunchedEffect(Unit) { vm.events.collect { snack.showSnackbar(it) } }
@@ -549,8 +513,8 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
                 snackbarHost = { SnackbarHost(snack) },
                 topBar = {
                     if (tab == Tab.Home) {
-                        AppHeader("Today", LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase(), elevated = scrollY < -4f)
-                    } else AppHeader(tab.label, elevated = scrollY < -4f)
+                        AppHeader("Today", LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase())
+                    } else AppHeader(tab.label)
                 },
                 floatingActionButton = {
                     if (tab == Tab.Home) {
@@ -576,7 +540,7 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
                     }
                 },
             ) { inner ->
-                Box(Modifier.padding(inner).nestedScroll(scrollWatcher)) {
+                Box(Modifier.padding(inner)) {
                     Crossfade(tab, label = "tab") { current ->
                         when (current) {
                             Tab.Home -> HomeScreen(vm, s, goTimer = { tab = Tab.Timer }, goBlocker = { tab = Tab.Blocker })
