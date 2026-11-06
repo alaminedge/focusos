@@ -13,7 +13,8 @@ android {
         applicationId = "com.focusos.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        // Rises with every CI build, so each APK is a clean "update" over the previous one.
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "1.0.0"
     }
 

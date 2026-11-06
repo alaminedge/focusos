@@ -1,0 +1,167 @@
+name: Build Focus OS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mobile uploads cannot create folders, so "a__b__c.kt" becomes "a/b/c.kt".
+      - name: Restore folders from flat file names
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for f in *__*; do
+            [ -f "$f" ] || continue
+            target="${f//__//}"
+            mkdir -p "$(dirname "$target")"
+            mv "$f" "$target"
+          done
+          find app -type f | sort
+
+      - name: Generate settings, properties and resources
+        shell: bash
+        run: |
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "FocusOS"
+          include(":app")
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+          org.gradle.caching=true
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          kotlin.code.style=official
+          EOF
+
+          R=app/src/main/res
+          mkdir -p $R/values $R/values-night $R/drawable $R/mipmap-anydpi-v26
+
+          cat > $R/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">Focus OS</string>
+          </resources>
+          EOF
+
+          cat > $R/values/colors.xml <<'EOF'
+          <resources>
+              <color name="window_bg">#FFF7FAF8</color>
+              <color name="ic_bg">#FF0F8F69</color>
+          </resources>
+          EOF
+
+          cat > $R/values-night/colors.xml <<'EOF'
+          <resources>
+              <color name="window_bg">#FF0E1512</color>
+          </resources>
+          EOF
+
+          cat > $R/values/themes.xml <<'EOF'
+          <resources>
+              <style name="Theme.FocusOS" parent="android:Theme.Material.Light.NoActionBar">
+                  <item name="android:windowBackground">@color/window_bg</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > $R/values-night/themes.xml <<'EOF'
+          <resources>
+              <style name="Theme.FocusOS" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">@color/window_bg</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > $R/drawable/ic_launcher_fg.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="6"
+                  android:strokeLineCap="round"
+                  android:pathData="M54,54m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0" />
+              <path android:fillColor="#FFFFFFFF"
+                  android:pathData="M54,54m-9,0a9,9 0,1 1,18 0a9,9 0,1 1,-18 0" />
+          </vector>
+          EOF
+
+          cat > $R/drawable/ic_stat.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4"
+                  android:pathData="M12,12m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+              <path android:fillColor="#FFFFFFFF"
+                  android:pathData="M12,12m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+          </vector>
+          EOF
+
+          cat > $R/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_bg" />
+              <foreground android:drawable="@drawable/ic_launcher_fg" />
+          </adaptive-icon>
+          EOF
+
+      # A fixed signing key means every build can be installed over the previous one
+      # without uninstalling, so your study history is never wiped by an update.
+      - name: Install stable signing key
+        shell: bash
+        run: |
+          mkdir -p ~/.android
+          echo "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" | base64 -d > ~/.android/debug.keystore
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # Prints the signing fingerprint. It must be identical in every run;
+      # if it is, each new APK installs over the old one and keeps your data.
+      - name: Show signing fingerprint
+        run: keytool -list -keystore ~/.android/debug.keystore -storepass android | grep -i -E "androiddebugkey|fingerprint"
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Name the APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk FocusOS-${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FocusOS-APK
+          path: FocusOS-${{ github.run_number }}.apk
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Focus OS build ${{ github.run_number }}
+          files: FocusOS-${{ github.run_number }}.apk
+          make_latest: true
