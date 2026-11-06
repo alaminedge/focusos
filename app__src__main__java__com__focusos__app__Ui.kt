@@ -255,9 +255,9 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: (@Composab
 fun AppHeader(title: String, subtitle: String? = null) {
     Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
-            Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.Center) {
+            Column(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 20.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) {
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(title, style = MaterialTheme.typography.headlineLarge)
+                Text(title, style = MaterialTheme.typography.headlineSmall)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
