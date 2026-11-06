@@ -48,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -687,7 +688,10 @@ fun TaskRow(t: TaskItem, onToggle: () -> Unit, onClick: () -> Unit) {
             if (t.subject.isNotBlank()) Text(t.subject, style = MaterialTheme.typography.labelMedium, color = cs.primary)
         }
         if (t.priority == 2 && !t.done) {
-            Text("High", style = MaterialTheme.typography.labelMedium, color = cs.error, modifier = Modifier.padding(end = 12.dp))
+            Text("High", style = MaterialTheme.typography.labelMedium, color = cs.error, modifier = Modifier.padding(end = 4.dp))
+        }
+        IconButton(onClick = onClick) {
+            Icon(Icons.Rounded.Edit, "Edit task", tint = cs.onSurfaceVariant)
         }
     }
 }
