@@ -143,6 +143,11 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      # Prints the signing fingerprint. It must be identical in every run;
+      # if it is, each new APK installs over the old one and keeps your data.
+      - name: Show signing fingerprint
+        run: keytool -list -keystore ~/.android/debug.keystore -storepass android | grep -i -E "androiddebugkey|fingerprint"
+
       - name: Build APK
         run: gradle :app:assembleDebug --stacktrace
 
