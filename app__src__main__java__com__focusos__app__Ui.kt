@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -246,6 +247,20 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier, action: (@Composab
     Row(modifier.fillMaxWidth().padding(top = 28.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         action?.invoke()
+    }
+}
+
+/** Fixed top bar: stays put while the screen content scrolls underneath. */
+@Composable
+fun AppHeader(title: String, subtitle: String? = null) {
+    Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.statusBarsPadding()) {
+            Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 20.dp, vertical = 10.dp), verticalArrangement = Arrangement.Center) {
+                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = MaterialTheme.typography.headlineLarge)
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
     }
 }
 
@@ -463,6 +478,11 @@ fun AppRoot(vm: AppViewModel, host: Host, urgeTick: Int) {
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snack) },
+                topBar = {
+                    if (tab == Tab.Home) {
+                        AppHeader("Today", LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase())
+                    } else AppHeader(tab.label)
+                },
                 floatingActionButton = {
                     if (tab == Tab.Home) {
                         ExtendedFloatingActionButton(
@@ -542,14 +562,6 @@ fun HomeScreen(vm: AppViewModel, s: AppSettings, goTimer: () -> Unit, goBlocker:
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 112.dp),
     ) {
-        item {
-            Text(
-                LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase(),
-                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ScreenTitle("Today")
-        }
-
         item {
             Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 ProgressRing(
@@ -782,8 +794,6 @@ fun TimerScreen(vm: AppViewModel, s: AppSettings) {
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 32.dp),
     ) {
-        item { ScreenTitle("Timer") }
-
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("stopwatch" to "Stopwatch", "25/5" to "25 / 5", "50/10" to "50 / 10", "custom" to "Custom").forEach { (key, label) ->

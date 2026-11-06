@@ -356,8 +356,6 @@ fun BlockerScreen(vm: AppViewModel, s: AppSettings, host: Host) {
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 32.dp),
     ) {
-        item { ScreenTitle("Blocker") }
-
         item {
             NoticeBanner(
                 "${guard.title}. ${guard.detail}", warn = !guard.ok,
@@ -676,8 +674,6 @@ fun AnalyticsScreen(vm: AppViewModel, s: AppSettings) {
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 32.dp),
     ) {
-        item { ScreenTitle("Analytics") }
-
         item {
             SectionTitle("Focus, last 7 days")
             BarChart(focusWeek, dayLabels, Modifier.padding(top = 8.dp), goal = s.goalMin * 60_000L)
@@ -776,8 +772,6 @@ fun SettingsScreen(vm: AppViewModel, s: AppSettings, host: Host) {
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 32.dp),
     ) {
-        item { ScreenTitle("Settings") }
-
         item {
             SectionTitle("Appearance")
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
